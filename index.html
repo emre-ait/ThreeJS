@@ -23,10 +23,21 @@
 			var camera;
 			var renderer;
 			var params = {
-				color: 0x00ff00
+				model: 'sofacabochon.obj', // Default model
+				texture: 'fabric/test.jpg' // Default texture
+			};
+
+			// Model scale values
+			const modelSettings = {
+				'sofacabochon.obj': { scale: 0.01, cameraPosition: { x: 1, y: 1, z: 1 } , cameraTarget: { x: 0, y: 0, z: 0 } },
+				'female02.obj': { scale: 0.01, cameraPosition: { x: 1, y: 1, z: 1 } , cameraTarget: { x: 0, y: 0, z: 0 } },
+				'scarf.obj': { scale: 0.01, cameraPosition: { x: 0, y: 2, z: 1 } , cameraTarget: { x: 0, y: 1.5, z: 0 } },
+				'tshirt.obj': { scale: 0.01, cameraPosition: { x: 1, y: 1, z: 1 } , cameraTarget: { x: 0, y: 0, z: 0 } },
+				'dress.obj':{ scale: 0.001, cameraPosition: { x: 1, y: 1, z: 1 } , cameraTarget: { x: 0, y: 1, z: 0 } },
 			};
 			var gui;
 			let object;
+			var modelFolder;
 			function createScene() {
 				gui = new GUI();
 
@@ -36,13 +47,9 @@
 				camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 				
 				renderer = new THREE.WebGLRenderer({physicallyCorrectLights : true, antialias: true, powerPreference: "high-performance"});
-				renderer.shadowMap.enabled = true;
+				//renderer.shadowMap.enabled = true;
 				renderer.setSize(window.innerWidth, window.innerHeight);
 				document.body.appendChild(renderer.domElement);
-
-				camera.position.z = 1;
-				camera.position.y = 1;
-				camera.position.x = 1;
 
 				ambientLight();
 
@@ -51,87 +58,67 @@
 				controls.maxPolarAngle = (80/180)*Math.PI;
 
 				function loadModel() {
-
-					object.traverse( function ( child ) {
-
-						if ( child.isMesh ) {
-							console.log(child);
-							
-							child.material.map = texture;
-							child.material.normalMap = textureNormalMap;
-							//child.material.aoMap = textureAOMap;
-							child.material.map.wrapS = THREE.RepeatWrapping;
-							child.material.map.wrapT = THREE.RepeatWrapping;
-							child.material.normalMap.wrapS = THREE.RepeatWrapping;
-							child.material.normalMap.wrapT = THREE.RepeatWrapping;
-							//child.material.aoMap.wrapS = THREE.RepeatWrapping;
-							//child.material.aoMap.wrapT = THREE.RepeatWrapping;
-							child.material.normalMap.repeat.set(1, 1);
-
-							child.material.map.repeat.set(5, 5);
-							//child.castShadow = true;
-							
-							gui.add(child.material.map.repeat, 'x', 1, 10).step(1).name("Model Repeat").onChange(function() {
-								child.material.map.repeat.set(child.material.map.repeat.x,child.material.map.repeat.x);
-								child.material.normalMap.repeat.set(1, 1);
-								//child.material.normalMap.repeat.set(child.material.map.repeat.x,child.material.map.repeat.x);
-							
-							});
-
-						}
-
-
-					} );
-
-					object.position.y = 0;
-					object.position.x = 0;
-					object.scale.setScalar( 0.01);
-					scene.add( object );
-
-					render();
-
-				}
-				const manager = new THREE.LoadingManager( loadModel );
-
-				// texture
-
-				const textureLoader = new THREE.TextureLoader( manager );
-				const texture = textureLoader.load( './fabric/badilli.png', render );
-				const textureNormalMap = textureLoader.load('./fabric/Ekose_normal.jpg', render );
-				const textureAOMap = textureLoader.load('./fabric/Ekose_ao.jpg', render );
-				const texture2 = textureLoader.load( './fabric/face.jpg', render );
-				const hair = textureLoader.load( './fabric/hair.jpg', render );
-				texture.colorSpace = THREE.SRGBColorSpace;
-
-				// model
-
-				function onProgress( xhr ) {
-
-					if ( xhr.lengthComputable ) {
-
-						const percentComplete = xhr.loaded / xhr.total * 100;
-						console.log( 'model ' + percentComplete.toFixed( 2 ) + '% downloaded' );
-
+					if (object) {
+						scene.remove(object);
+						object = null;
+						
+					}
+					if (modelFolder) {
+						gui.removeFolder(modelFolder);
 					}
 
+					const loader = new OBJLoader();
+					loader.load(`./models/${params.model}`, function (obj) {
+						object = obj;
+						object.traverse(function (child) {
+							if (child.isMesh) {
+								child.material = new THREE.MeshStandardMaterial({
+									map: texture,
+									normalMap: textureNormalMap,
+									side: THREE.DoubleSide // Make the material double-sided
+								});
+								child.material.map = texture;
+								child.material.normalMap = textureNormalMap;
+								child.material.map.wrapS = THREE.RepeatWrapping;
+								child.material.map.wrapT = THREE.RepeatWrapping;
+								child.material.normalMap.wrapS = THREE.RepeatWrapping;
+								child.material.normalMap.wrapT = THREE.RepeatWrapping;
+								child.material.normalMap.repeat.set(1, 1);
+								child.material.map.repeat.set(5, 5);
+
+								
+							}
+						});
+						object.position.y = 0;
+						object.position.x = 0;
+						// Set object scale based on the model
+						const settings = modelSettings[params.model] || { scale: 0.01, cameraPosition: { x: 1, y: 1, z: 1 }, cameraTarget: { x: 0, y: 0, z: 0 } };
+						object.scale.setScalar(settings.scale);
+						camera.position.set(settings.cameraPosition.x, settings.cameraPosition.y, settings.cameraPosition.z);
+						camera.lookAt(settings.cameraTarget.x, settings.cameraTarget.y, settings.cameraTarget.z);
+						controls.target.set(settings.cameraTarget.x, settings.cameraTarget.y, settings.cameraTarget.z);
+
+						scene.add(object);
+						// Create new folder for the new model
+						modelFolder = gui.addFolder('Model Settings');
+						modelFolder.add(object.children[0].material.map.repeat, 'x', 1, 10).step(1).name("Model Repeat").onChange(function() {
+							object.children[0].material.map.repeat.set(object.children[0].material.map.repeat.x, object.children[0].material.map.repeat.x);
+							object.children[0].material.normalMap.repeat.set(1, 1);
+						});
+						modelFolder.open();
+						render();
+					});
 				}
 
-				function onError() {}
+				const manager = new THREE.LoadingManager(loadModel);
 
-				const loader = new OBJLoader( manager );
-				loader.load( './obj/sofacabochon.obj', function ( obj ) {
+				const textureLoader = new THREE.TextureLoader(manager);
+				var texture = textureLoader.load(params.texture, render);
+				var textureNormalMap = textureLoader.load('./fabric/normal.jpg', render);
+				texture.colorSpace = THREE.SRGBColorSpace;
 
-					object = obj;
+				loadModel();
 
-				}, onProgress, onError );
-
-				//
-
-
-				
-				//createBox('box1', 1, 1, 1, 0, 0.5, 0, './fabric/1');
-				createBox('floor', 10, 1, 10, 0, -0.5, 0, './floor/WoodFloor');
-				
 				var camPos = gui.addFolder('Camera Position');
 				
 				camPos.add(camera.position, 'x', -20, 20).step(0.1).onChange(function() {
@@ -145,25 +132,19 @@
 				});
 				camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-				// var fp = gui.addFolder('Position');
-				// var fr = gui.addFolder('Rotation');
-				// var fc = gui.addFolder('Color');
-				// fp.add(scene.getObjectByName('box1').position, 'x', 0, 5);
-				// fp.add(scene.getObjectByName('box1').position, 'y', 0, 5);
-				// fp.add(scene.getObjectByName('box1').position, 'z', 0, 10);
-				// fr.add(scene.getObjectByName('box1').rotation, 'x', 0, 5);
-				// fr.add(scene.getObjectByName('box1').rotation, 'y', 0, 5);
-				// fr.add(scene.getObjectByName('box1').rotation, 'z', 0, 10);
-				// fc.addColor(params, 'color').onChange(function() {
-				// 	scene.getObjectByName('box1').material.color.set(params.color);
-				// });
-
-				//var gridHelper = new THREE.GridHelper(5, 10, 0xff0000, 0x808080);
-				//scene.add(gridHelper);
-				//var axesHelper = new THREE.AxesHelper(1);
-				//scene.add(axesHelper);
-				//var arrowHelper = new THREE.ArrowHelper(new THREE.Vector3(1, 1, 1), new THREE.Vector3(0, 0, 0), 1, 0xff0000);
-				//scene.add(arrowHelper);
+				const models = ['sofacabochon.obj', 'female02.obj', 'Male_Tshirt.obj', 'scarf.obj', 'dress.obj']; // Add your model filenames here
+				gui.add(params, 'model', models).name("Model").onChange(loadModel);
+				gui.add(params, 'texture', ['./fabric/badilli.png', './fabric/face.jpg', './fabric/hair.jpg']).name("Texture").onChange(function(value) {
+					texture = textureLoader.load(value, function() {
+						object.traverse(function(child) {
+							if (child.isMesh) {
+								child.material.map = texture;
+								child.material.map.needsUpdate = true;
+							}
+						});
+						render();
+					});
+				});
 
 				createSpotLight();
 			
@@ -172,38 +153,9 @@
 
 			function render() {
 				renderer.render(scene, camera);
-				//scene.getObjectByName('box1').rotation.x += 0.01;
 				requestAnimationFrame(render);
 			}
 
-			function createBox(name, w, h, d, x, y, z, texture) {
-				var repeatcount = 1;
-				var geometry = new THREE.BoxGeometry(w, h, d, 100, 100, 100);
-				var material = new THREE.MeshStandardMaterial({color: 0xffffff});
-				var loader = new THREE.TextureLoader();
-				material.map = loader.load(texture + '.jpg');
-				material.normalMap = loader.load(texture + '_normal.jpg');
-			
-				if (name == 'floor') {
-					material.map.wrapS = THREE.RepeatWrapping;
-					material.map.wrapT = THREE.RepeatWrapping;
-					material.map.repeat.set(5, 5);
-					material.normalMap.wrapS = THREE.RepeatWrapping;
-					material.normalMap.wrapT = THREE.RepeatWrapping;
-					material.normalMap.repeat.set(5, 5);
-					gui.add(material.map.repeat, 'x', 0, 10).step(1).name("Floor Repeat").onChange(function() {
-						material.map.repeat.set(material.map.repeat.x,material.map.repeat.x);
-						material.normalMap.repeat.set(material.map.repeat.x,material.map.repeat.x);
-					});
-				}
-				
-				var mesh = new THREE.Mesh(geometry, material);
-				mesh.position.set(x, y, z);
-				mesh.name = name;
-				mesh.castShadow = true;
-				mesh.receiveShadow = true;
-				scene.add(mesh);
-			}
 			function createSpotLight() {
 				var spotpos = gui.addFolder('SpotLight Position');
 				var spotset = gui.addFolder('SpotLight Settings');
@@ -251,10 +203,6 @@
 				spotTarget.add(target.position, 'z', -10, 10).step(0.1).onChange(function() {
 					target.position.z = target.position.z;
 				});
-				//var helper = new THREE.SpotLightHelper(spotLight);
-				//scene.add(helper);
-				//var cameraHelper = new THREE.CameraHelper(spotLight.shadow.camera);
-				//scene.add(cameraHelper);
 
 				scene.add(spotLight);
 				scene.add(target);
@@ -262,14 +210,10 @@
 
 			function ambientLight() {
 				var ambientLight = new THREE.AmbientLight(0x404040, 1);
-				ambientLight.castShadow = true;
 				scene.add(ambientLight);
 			}
 
 			createScene();
-
-
-
     </script>
 	</body>
 </html>
